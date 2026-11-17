@@ -62,4 +62,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/erenyea9er69/devops-atl/campus-tasks:${{ github.ref_name }}
+          tags: |
+            ghcr.io/erenyea9er69/devops-atl/campus-tasks:${{ github.ref_name }}
+            ghcr.io/erenyea9er69/devops-atl/campus-tasks:latest
