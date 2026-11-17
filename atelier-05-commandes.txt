@@ -6,6 +6,8 @@ Contexte
 Le dépôt fourni était vide. Le projet d'atelier est maintenant créé sur la branche
 atelier-05. Commandes prévues pour PowerShell sous Windows. Docker Desktop doit
 être démarré pour les étapes de conteneur. Aucun secret ne doit être ajouté au dépôt.
+Pour rejouer après la fusion de la PR, les étapes 1 à 3 sont déjà faites : commencez
+à l'étape 4. Chaque rejeu publie un nouveau tag horodaté ; un tag existant reste fixe.
 
 1) Récupérer le dépôt et se placer sur la branche
 -------------------------------------------------
@@ -42,25 +44,29 @@ l'image seulement après le succès du job test.
 Option avec GitHub CLI installé et connecté :
 gh pr create --base main --head atelier-05 --title "Atelier 05 - chaîne CI/CD" --body "Ajoute tests, workflow CI, image Docker et procédure staging/rollback."
 
-4) Fusionner puis créer et publier la version v1.0.0
-----------------------------------------------------
-Après validation et fusion de la pull request :
+4) Créer un tag inédit et publier une nouvelle version
+------------------------------------------------------
+Après fusion de la pull request et quand le workflow CI est vert :
 git switch main
 git pull --ff-only origin main
-git tag -a v1.0.0 -m "Release 1.0.0"
-git show v1.0.0
-git push origin v1.0.0
+$releaseTag = "v1.0.$(Get-Date -Format 'yyyyMMddHHmmssfff')"
+git tag -a $releaseTag -m "Release $releaseTag"
+git show $releaseTag
+git push origin $releaseTag
 
-Le push du tag déclenche tests puis publication GHCR. L'image publiée sera :
-ghcr.io/erenyea9er69/devops-atl/campus-tasks:v1.0.0
+Le tag horodaté est inédit à chaque exécution. Son push déclenche tests puis
+publication GHCR des tags :$releaseTag et :latest. Le pointeur :latest est remplacé
+à chaque release ; les tags horodatés précédents restent immuables. Attendez le run
+vert dans GitHub Actions avant de passer au pull en staging.
 
-Ne jamais déplacer ou reconstruire un tag publié. Pour une correction, publier
-une nouvelle version, par exemple v1.0.1.
+Permission GHCR : le job publish-image utilise déjà packages: write et le secret
+éphémère secrets.GITHUB_TOKEN fourni par GitHub Actions. Aucun token personnel
+n'est requis dans le dépôt. Le pull anonyme de v1.0.0 a été vérifié.
 
-5) Démarrer Docker Desktop puis déployer v1.0.0 dans staging
-------------------------------------------------------------
+5) Démarrer Docker Desktop puis déployer la nouvelle version dans staging
+------------------------------------------------------------------------
 docker info
-@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=v1.0.0") | Set-Content -Encoding ascii .env.deploy
+@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=$releaseTag") | Set-Content -Encoding ascii .env.deploy
 docker compose --env-file .env.deploy -f compose.staging.yaml pull
 docker compose --env-file .env.deploy -f compose.staging.yaml up -d
 docker compose --env-file .env.deploy -f compose.staging.yaml ps
@@ -84,7 +90,7 @@ Le health check doit échouer. Recopier l'heure et la première erreur utile dan
 docs/incident-report.md. Mesurer la durée de l'interruption pendant l'exercice.
 
 Restaurer la version saine déjà publiée :
-@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=v1.0.0") | Set-Content -Encoding ascii .env.deploy
+@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=$releaseTag") | Set-Content -Encoding ascii .env.deploy
 docker compose --env-file .env.deploy -f compose.staging.yaml pull
 docker compose --env-file .env.deploy -f compose.staging.yaml up -d
 bash scripts/wait-healthy.sh
