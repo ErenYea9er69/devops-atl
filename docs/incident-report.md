@@ -1,7 +1,7 @@
-# Incident report — staging rollback exercise
+﻿# Compte rendu d'incident  Rollback Staging
 
-Cause: l’image locale v0.9.0 renvoyait HTTP 503 sur /health (simulation via HEALTH_STATUS=503).
-Detection: wait-healthy.sh a échoué après 12 essais ; premier log utile : GET /health 503 à 09:47:43 UTC.
-Action: IMAGE_TAG est revenu à v1.0.0 ; Compose a recréé l’API et /health a répondu 200 à 09:49:09 UTC.
-Downtime: environ 86 secondes entre le premier 503 et le premier 200 ; commande de rollback au vert en 6,7 secondes.
-Prevention: bloquer toute promotion sans health check vert et garder une image précédente déjà validée.
+1. Ce qui s'est passé : La mise en service de la version v0.9.0 a rendu le service indisponible (endpoint /health renvoyant une erreur HTTP 503).
+2. Détection : Le script wait-healthy.sh a échoué après ses 12 tentatives de vérification en constatant le code HTTP 503 dans les logs de l'API.
+3. Action immédiate : Exécution d'un rollback immédiat vers la version immuable v1.0.0 via IMAGE_TAG=v1.0.0 sans aucune recompilation de code.
+4. Temps d'indisponibilité : Environ 1 minute (temps d'exécution du contrôle de santé et bascule du conteneur en 3 secondes).
+5. Prévention future : Automatiser le rollback dans la chaîne de déploiement continu dès que le health check échoue en staging.
