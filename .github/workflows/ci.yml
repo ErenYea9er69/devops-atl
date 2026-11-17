@@ -1,0 +1,65 @@
+name: CI and release image
+
+on:
+  pull_request:
+  push:
+    branches: [main, atelier-05]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests and write JUnit report
+        run: python -m pytest -q tests --junitxml=report.xml
+        env:
+          PYTHONPATH: .
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rapport-tests
+          path: report.xml
+          if-no-files-found: warn
+
+  docker-build:
+    needs: test
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: campus-tasks:ci
+
+  publish-image:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/erenyea9er69/devops-atl/campus-tasks:${{ github.ref_name }}

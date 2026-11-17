@@ -1,0 +1,113 @@
+ATELIER 05 — CAMPUS TASKS — COMMANDES REJOUABLES
+==================================================
+
+Contexte
+--------
+Le dépôt fourni était vide. Le projet d'atelier est maintenant créé sur la branche
+atelier-05. Commandes prévues pour PowerShell sous Windows. Docker Desktop doit
+être démarré pour les étapes de conteneur. Aucun secret ne doit être ajouté au dépôt.
+
+1) Récupérer le dépôt et se placer sur la branche
+-------------------------------------------------
+git clone https://github.com/ErenYea9er69/devops-atl.git
+cd devops-atl
+git switch atelier-05
+
+Si le dépôt est déjà cloné :
+git switch atelier-05
+git pull --ff-only origin atelier-05
+
+2) Créer l'environnement Python et exécuter les tests localement
+-----------------------------------------------------------------
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+python -m pytest -q tests --junitxml=report.xml
+
+Le rapport report.xml est ignoré par Git. L'artefact téléchargeable de la CI est
+produit par GitHub Actions et s'appelle rapport-tests.
+
+3) Examiner et envoyer la branche pour déclencher la CI
+--------------------------------------------------------
+git status --short
+git add .gitignore requirements.txt requirements-dev.txt app.py tests Dockerfile compose.yaml compose.staging.yaml .github/workflows/ci.yml scripts docs atelier-05-commandes.txt
+git commit -m "ci: ajouter pipeline et déploiement staging"
+git push -u origin atelier-05
+
+Ouvrir ensuite une pull request vers main sur GitHub. Le workflow testera la
+contribution, conservera report.xml même si pytest échoue, puis construira
+l'image seulement après le succès du job test.
+
+Option avec GitHub CLI installé et connecté :
+gh pr create --base main --head atelier-05 --title "Atelier 05 - chaîne CI/CD" --body "Ajoute tests, workflow CI, image Docker et procédure staging/rollback."
+
+4) Fusionner puis créer et publier la version v1.0.0
+----------------------------------------------------
+Après validation et fusion de la pull request :
+git switch main
+git pull --ff-only origin main
+git tag -a v1.0.0 -m "Release 1.0.0"
+git show v1.0.0
+git push origin v1.0.0
+
+Le push du tag déclenche tests puis publication GHCR. L'image publiée sera :
+ghcr.io/erenyea9er69/devops-atl/campus-tasks:v1.0.0
+
+Ne jamais déplacer ou reconstruire un tag publié. Pour une correction, publier
+une nouvelle version, par exemple v1.0.1.
+
+5) Démarrer Docker Desktop puis déployer v1.0.0 dans staging
+------------------------------------------------------------
+docker info
+@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=v1.0.0") | Set-Content -Encoding ascii .env.deploy
+docker compose --env-file .env.deploy -f compose.staging.yaml pull
+docker compose --env-file .env.deploy -f compose.staging.yaml up -d
+docker compose --env-file .env.deploy -f compose.staging.yaml ps
+bash scripts/wait-healthy.sh
+
+La dernière commande doit afficher "staging sain". Le fichier .env.deploy est
+ignoré par Git ; il ne contient ici que des valeurs non sensibles.
+
+6) Démontrer une version défectueuse, lire les journaux, puis rollback
+---------------------------------------------------------------------
+Construire une image de démonstration qui répond 503 au health check :
+docker build --build-arg HEALTH_STATUS=503 -t ghcr.io/erenyea9er69/devops-atl/campus-tasks:v0.9.0 .
+
+Déployer l'image de test locale (ne pas la publier) :
+@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=v0.9.0") | Set-Content -Encoding ascii .env.deploy
+docker compose --env-file .env.deploy -f compose.staging.yaml up -d
+bash scripts/wait-healthy.sh
+docker compose --env-file .env.deploy -f compose.staging.yaml logs --tail=50 api
+
+Le health check doit échouer. Recopier l'heure et la première erreur utile dans
+docs/incident-report.md. Mesurer la durée de l'interruption pendant l'exercice.
+
+Restaurer la version saine déjà publiée :
+@("IMAGE_NAME=ghcr.io/erenyea9er69/devops-atl/campus-tasks", "IMAGE_TAG=v1.0.0") | Set-Content -Encoding ascii .env.deploy
+docker compose --env-file .env.deploy -f compose.staging.yaml pull
+docker compose --env-file .env.deploy -f compose.staging.yaml up -d
+bash scripts/wait-healthy.sh
+
+7) Versionner le compte rendu et terminer
+-----------------------------------------
+Compléter les cinq lignes de docs/incident-report.md avec les observations
+réelles, puis :
+git switch atelier-05
+git add docs/incident-report.md
+git commit -m "docs: consigner le rollback staging"
+git push
+
+Pour arrêter la pile de staging après l'atelier :
+docker compose --env-file .env.deploy -f compose.staging.yaml down
+
+Dépannage
+---------
+- Si docker info échoue sur Windows, démarrer Docker Desktop et attendre que le
+  moteur Linux soit prêt, puis relancer docker info.
+- Si le pull GHCR est refusé, vérifier que le job publish-image est vert et que
+  le paquet est public ou que le poste est connecté au registre.
+- Si le port 8080 est occupé, arrêter l'autre pile avant de relancer Compose.
+- Pour vérifier que les fichiers .env locaux ne sont pas suivis :
+  git check-ignore -v .env.deploy .env.staging
+- Ne jamais coller un token ou mot de passe dans ce fichier, un commit ou un log.
