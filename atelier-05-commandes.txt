@@ -23,7 +23,7 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
-pytest -q --junitxml=report.xml
+python -m pytest -q tests --junitxml=report.xml
 
 Le rapport report.xml est ignoré par Git. L'artefact téléchargeable de la CI est
 produit par GitHub Actions et s'appelle rapport-tests.

@@ -11,17 +11,19 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements-dev.txt
       - name: Run tests and write JUnit report
-        run: pytest -q --junitxml=report.xml
-      - uses: actions/upload-artifact@v4
+        run: python -m pytest -q tests --junitxml=report.xml
+        env:
+          PYTHONPATH: .
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: rapport-tests
@@ -31,9 +33,9 @@ jobs:
   docker-build:
     needs: test
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
@@ -44,12 +46,12 @@ jobs:
   publish-image:
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
