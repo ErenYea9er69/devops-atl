@@ -1,0 +1,6 @@
+services:
+  api:
+    image: ${IMAGE_NAME:-ghcr.io/erenyea9er69/devops-atl/campus-tasks}:${IMAGE_TAG:?Set IMAGE_TAG in the deployment env file}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
